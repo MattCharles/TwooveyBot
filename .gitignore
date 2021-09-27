@@ -1,3 +1,4 @@
 token.pickle
 youtube.json
-.env
+*\.webm
+\.env

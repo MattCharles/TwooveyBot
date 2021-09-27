@@ -57,11 +57,12 @@ class CustomClient(discord.Client):
 
     async def join_voice(self, message):
         voice = message.author.voice
+        if voice is None:
+            await message.send(str(message.author.name) + " is not in a voice chat!")
+            return None
         caller = voice.channel
         self.voice_channel = caller
-        if caller is None:
-            await message.send(str(message.author.name) + " is not in a voice chat!")
-        elif self.voice_channel is not None and self.voice_channel != caller:
+        if self.voice_channel is not None and self.voice_channel != caller:
             await message.send("I'm already in another chat!")
         elif self.voice_channel is not None and self.voice_channel == caller:
             if self.voice_connection is None:
@@ -76,6 +77,8 @@ class CustomClient(discord.Client):
             return #ignore self
 
         voice_connection = await self.join_voice(message)
+        if voice_connection is None:
+            return
 
         print('Currently playing? {0}'.format(self.playing))
         if message.content.strip()=='-q':
