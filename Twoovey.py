@@ -37,7 +37,7 @@ class CustomClient(discord.Client):
         voice_connection.play(discord.FFmpegPCMAudio(executable="C:/ffmpeg/bin/ffmpeg.exe", source=filename))
         if not voice_connection.is_playing():
             self.playing = False
-            await self.play(self)
+            await self.play(self, voice_connection)
 
     def add_to_queue(self, entry):
         self.music_queue.put((self.queue_buffer - self.queue_current, entry))
@@ -88,7 +88,8 @@ class CustomClient(discord.Client):
         if message.content.startswith('-q '):
             user_query = message.content[2:]
             data = get_youtube_data_from_query(user_query)
-            self.add_to_queue(data)
+            self.youtube_credential_cache = data[2]
+            self.add_to_queue(data[0:1])
             await message.channel.send('Adding a new song to the queue: {0}'.format(data[1]))
             if not self.playing:
                 self.playing = True
@@ -138,15 +139,15 @@ class YTDLSource(discord.PCMVolumeTransformer):
         filename = data['title'] if stream else ytdl.prepare_filename(data)
         return filename
 
-def get_youtube_data_from_query(query):
-    youtube = youtube_authenticate()
+def get_youtube_data_from_query(query, cached_youtube_credential = None):
+    youtube = cached_youtube_credential or youtube_authenticate()
     data = search(youtube, q=query, maxResults=1).get("items")[0]
     videoId = data["id"]["videoId"]
     print(videoId)
     title = data["snippet"]["title"]
     youtube_url = YOUTUBE_PREFIX + videoId
 
-    return youtube_url, title
+    return youtube_url, title, youtube
 
 # TODO: this is eating my API limit for the day, need to refactor instead of reauthing every single fucking time
 def youtube_authenticate():
