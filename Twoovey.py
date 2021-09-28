@@ -33,16 +33,18 @@ class CustomClient(discord.Client):
         self.now_playing = None
         self.youtube_credential_cache = None
 
-    async def reset(self, voice_connection):
+    async def reset(self, voice_connection, previous_file):
         self.playing = False
+        os.remove(previous_file)
         if self.music_queue._qsize() == 0:
+            self.text_channel.send('Queue is empty! Taking a break')
             return
         await self.play(voice_connection)
 
     async def start_audio(self, voice_connection, filename):
         if self.text_channel is not None:
             await self.text_channel.send('Now playing {0}'.format(self.now_playing[1]))
-        voice_connection.play(discord.FFmpegPCMAudio(executable="C:/ffmpeg/bin/ffmpeg.exe", source=filename), after = lambda e: client.loop.create_task(self.reset(voice_connection)))
+        voice_connection.play(discord.FFmpegPCMAudio(executable="C:/ffmpeg/bin/ffmpeg.exe", source=filename), after = lambda e: client.loop.create_task(self.reset(voice_connection, previous_file = filename)))
 
     @tasks.loop()
     async def play(self, voice_connection):
