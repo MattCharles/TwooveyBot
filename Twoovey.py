@@ -1,4 +1,6 @@
 import asyncio
+from discord.ext import tasks
+from asyncio.tasks import sleep
 from subprocess import call
 import time
 import discord
@@ -29,15 +31,27 @@ class CustomClient(discord.Client):
         self.voice_connection = None
         self.now_playing = None
         self.youtube_credential_cache = None
-    
+
+    async def reset(self, voice_connection):
+        self.playing = False
+        if self.music_queue._qsize() == 0:
+            return
+        await self.play(voice_connection)
+
+    async def start_audio(self, voice_connection, filename):
+        voice_connection.play(discord.FFmpegPCMAudio(executable="C:/ffmpeg/bin/ffmpeg.exe", source=filename), after = lambda e: client.loop.create_task(self.reset(voice_connection)))
+
+    @tasks.loop()
     async def play(self, voice_connection):
-        # 1 because the 0 is the weight of the value
-        self.now_playing = self.music_queue.get()[1]
-        filename = await YTDLSource.from_url(self.now_playing[0])
-        voice_connection.play(discord.FFmpegPCMAudio(executable="C:/ffmpeg/bin/ffmpeg.exe", source=filename))
-        if not voice_connection.is_playing():
-            self.playing = False
-            await self.play(self, voice_connection)
+        if not self.playing:
+            # 1 because the 0 is the weight of the value
+            self.now_playing = self.music_queue.get()[1]
+            
+            if self.now_playing is not None:
+                self.playing = True
+                filename = await YTDLSource.from_url(self.now_playing[0])
+                await self.start_audio(voice_connection, filename)
+                 
 
     def add_to_queue(self, entry):
         self.music_queue.put((self.queue_buffer - self.queue_current, entry))
@@ -48,10 +62,10 @@ class CustomClient(discord.Client):
         dupe_queue = self.music_queue
         i=1
         if self.now_playing is not None:
-            result = result + 'Now playing: {0}\n'.format(self.now_playing[1])
+            result = result + 'Now playing: {0}\n'.format(self.now_playing)
         while not dupe_queue.empty():
             next_item = dupe_queue.get()
-            result = result + '{0} | {1}\n'.format(i, next_item[1][1])
+            result = result + '{0} | {1}\n'.format(i, next_item[1])
             i = i+1
         return result
 
@@ -89,15 +103,15 @@ class CustomClient(discord.Client):
             user_query = message.content[2:]
             data = get_youtube_data_from_query(user_query)
             self.youtube_credential_cache = data[2]
-            self.add_to_queue(data[0:1])
+            self.add_to_queue(data[0:2])
             await message.channel.send('Adding a new song to the queue: {0}'.format(data[1]))
             if not self.playing:
-                self.playing = True
                 await self.play(voice_connection)
             await message.channel.send(data[1])
 
         if message.content.startswith('-skip'):
             self.voice_connection.stop()
+            self.playing=False
             await self.play(voice_connection=voice_connection)
 
 
@@ -149,7 +163,6 @@ def get_youtube_data_from_query(query, cached_youtube_credential = None):
 
     return youtube_url, title, youtube
 
-# TODO: this is eating my API limit for the day, need to refactor instead of reauthing every single fucking time
 def youtube_authenticate():
     os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
     api_service_name = "youtube"
