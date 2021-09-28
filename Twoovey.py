@@ -27,6 +27,7 @@ class CustomClient(discord.Client):
         self.queue_current = 0
         self.music_queue = PriorityQueue()
         self.playing = False
+        self.text_channel = None
         self.voice_channel = None
         self.voice_connection = None
         self.now_playing = None
@@ -39,6 +40,8 @@ class CustomClient(discord.Client):
         await self.play(voice_connection)
 
     async def start_audio(self, voice_connection, filename):
+        if self.text_channel is not None:
+            await self.text_channel.send('Now playing {0}'.format(self.now_playing[1]))
         voice_connection.play(discord.FFmpegPCMAudio(executable="C:/ffmpeg/bin/ffmpeg.exe", source=filename), after = lambda e: client.loop.create_task(self.reset(voice_connection)))
 
     @tasks.loop()
@@ -72,12 +75,12 @@ class CustomClient(discord.Client):
     async def join_voice(self, message):
         voice = message.author.voice
         if voice is None:
-            await message.send(str(message.author.name) + " is not in a voice chat!")
+            await message.channel.send(str(message.author.name) + " is not in a voice chat!")
             return None
         caller = voice.channel
         self.voice_channel = caller
         if self.voice_channel is not None and self.voice_channel != caller:
-            await message.send("I'm already in another chat!")
+            await message.channel.send("I'm already in another voice channel!")
         elif self.voice_channel is not None and self.voice_channel == caller:
             if self.voice_connection is None:
                 self.voice_connection = await self.voice_channel.connect()
@@ -94,22 +97,23 @@ class CustomClient(discord.Client):
         if voice_connection is None:
             return
 
+        self.text_channel = message.channel
         print('Currently playing? {0}'.format(self.playing))
         if message.content.strip()=='-q':
             song_list = self.list_queue() or 'No songs queued!'
-            await message.channel.send(song_list)
+            await self.text_channel.send(song_list)
 
         if message.content.startswith('-q '):
             user_query = message.content[2:]
             data = get_youtube_data_from_query(user_query)
             self.youtube_credential_cache = data[2]
             self.add_to_queue(data[0:2])
-            await message.channel.send('Adding a new song to the queue: {0}'.format(data[1]))
+            await self.text_channel.send('Adding a new song to the queue: {0}'.format(data[1]))
             if not self.playing:
                 await self.play(voice_connection)
-            await message.channel.send(data[1])
 
         if message.content.startswith('-skip'):
+            await self.text_channel.send('Skipping {0}...'.format(self.now_playing[1]))
             self.voice_connection.stop()
             self.playing=False
             await self.play(voice_connection=voice_connection)
