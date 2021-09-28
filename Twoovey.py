@@ -36,8 +36,7 @@ class CustomClient(discord.Client):
     async def reset(self, voice_connection, previous_file):
         self.playing = False
         os.remove(previous_file)
-        if self.music_queue._qsize() == 0:
-            self.text_channel.send('Queue is empty! Taking a break')
+        if self.music_queue.qsize()==0:
             return
         await self.play(voice_connection)
 
@@ -55,6 +54,7 @@ class CustomClient(discord.Client):
             if self.now_playing is not None:
                 self.playing = True
                 filename = await YTDLSource.from_url(self.now_playing[0])
+                os.rename(filename, filename + str(self.queue_current)) # This prevents a bug where queueing the same song multiple times can cause later entries to get ignore)d
                 await self.start_audio(voice_connection, filename)
                  
 
@@ -67,10 +67,10 @@ class CustomClient(discord.Client):
         dupe_queue = self.music_queue
         i=1
         if self.now_playing is not None:
-            result = result + 'Now playing: {0}\n'.format(self.now_playing)
+            result = result + 'Now playing: {0}\n'.format(self.now_playing[1])
         while not dupe_queue.empty():
             next_item = dupe_queue.get()
-            result = result + '{0} | {1}\n'.format(i, next_item[1])
+            result = result + '{0} | {1}\n'.format(i, next_item[1][1])
             i = i+1
         return result
 
@@ -133,6 +133,7 @@ ytdl_format_options = {
     'quiet': True,
     'no_warnings': True,
     'default_search': 'auto',
+    'outtmpl': '%(title)s',
     'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
 }
 
