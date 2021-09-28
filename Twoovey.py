@@ -54,8 +54,9 @@ class CustomClient(discord.Client):
             if self.now_playing is not None:
                 self.playing = True
                 filename = await YTDLSource.from_url(self.now_playing[0])
-                os.rename(filename, filename + str(self.queue_current)) # This prevents a bug where queueing the same song multiple times can cause later entries to get ignore)d
-                await self.start_audio(voice_connection, filename)
+                new_filename = filename + str(self.queue_current)
+                os.rename(filename, new_filename) # This prevents a bug where queueing the same song multiple times can cause later entries to get ignore)d
+                await self.start_audio(voice_connection, new_filename)
                  
 
     def add_to_queue(self, entry):
